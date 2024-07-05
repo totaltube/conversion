@@ -2,8 +2,11 @@ package queries
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"log"
+	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -20,6 +23,13 @@ func getClient(server types.S3ServerInterface) (client *minio.Client, err error)
 	return minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: secure,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			DialContext: (&net.Dialer{
+				Timeout:   15 * time.Second,
+				KeepAlive: 15 * time.Second,
+			}).DialContext,
+		},
 	})
 }
 

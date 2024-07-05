@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	_ "image/png"
@@ -140,12 +141,18 @@ func ConvertVideoAction(sourceFile, resultFile string, videoBitrate, audioBitrat
 func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, format types.VideoFormatShort) (info types.ContentVideoInfo, err error) {
 	var sourceFile string
 	if tempPath == "" {
-		tempPath, err = ioutil.TempDir(conversionPath, "convert_video_")
+		tempPath, err = os.MkdirTemp(conversionPath, "convert_video_")
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		defer os.RemoveAll(tempPath)
+		defer func() {
+			if err != nil {
+				log.Println(tempPath)
+			} else {
+				os.RemoveAll(tempPath)
+			}
+		}()
 	}
 	if len(sourceFiles) > 1 {
 		// Need to concatenate videos first
@@ -163,7 +170,7 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 			concatFile += "file " + absPath + "\n"
 		}
 		concatFilePath := filepath.Join(tempPath, "concat.txt")
-		err = ioutil.WriteFile(concatFilePath, []byte(concatFile), 0644)
+		err = os.WriteFile(concatFilePath, []byte(concatFile), 0644)
 		if err != nil {
 			err = errors.New("can't write " + concatFilePath + " file: " + err.Error())
 			return
@@ -197,6 +204,10 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 	copyAudioStream := false
 	copyVideoStream := false
 	resizeOptions := ""
+	formatVideoBitrate := format.VideoBitrate
+	var sourceVideoBitrate uint64
+	var sourceWidth int64
+	var sourceHeight int64
 	for _, stream := range fileFormat.Streams {
 		if stream.CodecType == "audio" {
 			sourceAudioBitrate, _ := strconv.ParseUint(stream.BitRate, 10, 64)
@@ -217,6 +228,8 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 		}
 		if stream.CodecType == "video" {
 			sizeOk := true
+			sourceWidth = int64(stream.Width)
+			sourceHeight = int64(stream.Height)
 			if format.Crop && (format.Size.Width != int64(stream.Width) || format.Size.Height != int64(stream.Height)) {
 				sizeOk = false
 			}
@@ -226,9 +239,9 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 			if !format.Crop && math.Abs(float64(format.Size.Height-int64(stream.Height)))/float64(format.Size.Height) > 0.2 {
 				sizeOk = false
 			}
-			sourceVideoBitrate, _ := strconv.ParseUint(stream.BitRate, 10, 64)
+			sourceVideoBitrate, _ = strconv.ParseUint(stream.BitRate, 10, 64)
 			sourceVideoBitrate = sourceVideoBitrate / 1000
-			if sourceVideoBitrate != 0 && (sourceVideoBitrate < uint64(float32(format.VideoBitrate)*1.25) ||
+			if sourceVideoBitrate != 0 && (sourceVideoBitrate < uint64(float32(format.VideoBitrate)*1.2) ||
 				format.VideoBitrate == 0) {
 				format.VideoBitrate = int32(sourceVideoBitrate)
 				if format.Type == "mp4" && (stream.CodecName == "h264") {
@@ -244,7 +257,7 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 			if !sizeOk {
 				if format.Crop {
 					resizeOptions = fmt.Sprintf(`-vf scale=(iw*sar)*max(%d/(iw*sar)\,%d/ih):ih*max(%d/(iw*sar)\,%d/ih),crop=%d:%d`,
-						format.Size.Width, format.Size.Height, format.Size.Width, format.Size.Height)
+						format.Size.Width, format.Size.Height, format.Size.Width, format.Size.Height, format.Size.Width, format.Size.Height)
 				} else {
 					if float64(format.Size.Width)/float64(format.Size.Height) > float64(stream.Width)/float64(stream.Height) {
 						resizeOptions = fmt.Sprintf(`-vf scale=-2:%d`, format.Size.Height)
@@ -256,9 +269,14 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 			}
 		}
 	}
+	if float64(sourceVideoBitrate) < float64(formatVideoBitrate)*1.2 && (float64(sourceWidth) < float64(format.Size.Width)*0.8 || float64(sourceHeight) < float64(format.Size.Height)*0.8) {
+		err = errors.New("source file is too low quality to create this format")
+		return
+	}
+
 	cmd := format.Command
 	if cmd == "" {
-		cmd = "ffmpeg -y -i %SOURCE_FILE% -an -pass 1 %VIDEO_OPTIONS% %RESIZE_OPTIONS% -preset fast -threads 2 %RESULT_FILE% && ffmpeg -y -i %SOURCE_FILE% %AUDIO_OPTIONS% -pass 2 %VIDEO_OPTIONS% %RESIZE_OPTIONS% -preset fast -threads 2 "
+		cmd = "ffmpeg -y -i %SOURCE_FILE% -an -pass 1 %VIDEO_OPTIONS% %RESIZE_OPTIONS% -preset fast -threads 2 -f mp4 /dev/null && ffmpeg -y -i %SOURCE_FILE% %AUDIO_OPTIONS% -pass 2 %VIDEO_OPTIONS% %RESIZE_OPTIONS% -preset fast -threads 2 "
 		if format.Type == "mp4" {
 			cmd += "-movflags faststart "
 		}
@@ -276,6 +294,7 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 	}
 	var resultFile = filepath.Join(targetPath, fmt.Sprintf("video-%s.%s", format.Name, format.Type))
 	resultFileAbs, _ := filepath.Abs(resultFile)
+	syscall.Sync()
 	cmd = strings.ReplaceAll(cmd, "%SOURCE_FILE%", sourceFile)
 	cmd = strings.ReplaceAll(cmd, "%SOURCE_FILE_BASE%", filepath.Base(sourceFile))
 	cmd = strings.ReplaceAll(cmd, "%WORKING_PATH%", tempPath)
@@ -287,26 +306,24 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 	cmd = strings.ReplaceAll(cmd, "%RESIZE_OPTIONS%", resizeOptions)
 	cmd = strings.ReplaceAll(cmd, "%TEMP_PATH%", "")
 	cmd = strings.ReplaceAll(cmd, "%FFMPEG%", "ffmpeg")
-	cmds := strings.Split(cmd, " && ")
-	for _, cm := range cmds {
-		nameArgs := strings.Split(cm, " ")
-		name := nameArgs[0]
-		args := nameArgs[1:]
-		var argsFiltered []string
-		for _, arg := range args {
-			if arg != "" {
-				argsFiltered = append(argsFiltered, arg)
-			}
-		}
-		command := exec.Command(name, argsFiltered...)
-		command.Dir = tempPath
-		out, err = command.CombinedOutput()
-		if err != nil {
-			log.Println(string(out))
-			err = errors.New("can't run command " + name + " " + strings.Join(argsFiltered, " ") + ": " + err.Error())
-			return
-		}
+	// Создаем команду для выполнения через bash
+	command := exec.Command("bash")
+	command.Dir, _ = filepath.Abs(tempPath)
+	// Создаем буфер, куда будем записывать стандартный вывод команды
+	var outBuffer bytes.Buffer
+	var errBuffer bytes.Buffer
+	command.Stdout = &outBuffer
+	command.Stderr = &errBuffer
+	command.Stdin = bytes.NewBufferString(cmd)
+	// Запускаем команду
+	err = command.Run()
+	if err != nil {
+		err = errors.Wrap(err, "can't run command for format "+format.Name)
+		log.Println(errBuffer.String())
+		log.Println(outBuffer.String())
+		return
 	}
+	syscall.Sync()
 	if !helpers.FileExists(resultFile) {
 		err = errors.New("result file " + resultFile + " not created during conversion. Something is wrong.")
 	}

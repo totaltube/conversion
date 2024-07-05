@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"math"
 	"math/rand"
 	"os/exec"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"github.com/totaltube/conversion/helpers"
 )
 
 func doExtractFrames(files []string, workingPath string, format *ExtractFramesFormat) (resultFiles []string, err error) {
@@ -98,9 +101,13 @@ func doExtractFrames2(file string, destinationPath string, maxAmount int64, inte
 		return
 	}
 	duration, _ := strconv.ParseFloat(fileFormat.Format.Duration, 64)
-	if duration < 3 {
-		err = errors.New("video size < 3 seconds")
+	if duration < 0.05 {
+		log.Println(helpers.ToJSON(fileFormat))
+		err = errors.New("video size < 0.05 seconds")
 		return
+	}
+	if duration < 20 {
+		maxAmount = 1
 	}
 	var startOffset float64
 	if randomize {

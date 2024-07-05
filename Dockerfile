@@ -1,8 +1,11 @@
-FROM sersh/ffmegmagick
+FROM sersh/ffmpegmagick
 
 COPY totaltube-conversion /bin/
 COPY .bashrc /root/
 WORKDIR /data
 VOLUME /data
-ENTRYPOINT ["totaltube-conversion"]
+ENV ISCUDA=0
+COPY conversion-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/conversion-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/conversion-entrypoint.sh"]
 EXPOSE 8080

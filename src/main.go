@@ -17,6 +17,7 @@ var conversionPath = os.Getenv("TOTALTUBE_CONVERSION_PATH")
 var conversionApiKey = os.Getenv("TOTALTUBE_CONVERSION_API_KEY")
 
 func main() {
+	log.SetFlags(log.Lshortfile)
 	if port == "" {
 		port = "8080"
 	}

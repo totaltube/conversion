@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -29,7 +28,7 @@ func makeVideoHandler(c *gin.Context) {
 	}
 
 	var tmpDir string
-	tmpDir, err = ioutil.TempDir(conversionPath, "make_video_")
+	tmpDir, err = os.MkdirTemp(conversionPath, "make_video_")
 	if err != nil {
 		log.Println(err)
 		c.JSON(200, M{"success": false, "value": err.Error()})
@@ -76,13 +75,28 @@ func makeVideoHandler(c *gin.Context) {
 	filenames, _ := filepath.Glob(filepath.Join(tmpDir, "sources", "*"))
 	var sourceNames = make([]string, 0, len(filenames))
 	for _, filename := range filenames {
-		m, _ := mimetype.DetectFile(filename)
-		mimeType := m.String()
+		var mimeType string
+		ext := filepath.Ext(filename)
+		if ext == ".mp4" {
+			mimeType = "video/mp4"
+		} else if ext == ".webm" {
+			mimeType = "video/webm"
+		} else {
+			m, err := mimetype.DetectFile(filename)
+			if err != nil {
+				log.Println(err)
+			}
+			mimeType = m.String()
+		}
 		if lo.Contains(videoTypes, mimeType) {
 			sourceNames = append(sourceNames, filename)
+		} else {
+			log.Println("wrong mime type - ", mimeType, " for file ", filename)
 		}
 	}
+
 	if len(sourceNames) == 0 {
+		log.Println("Filenames: ", filenames, "Source file names", sourceFileNames)
 		c.JSON(200, M{"success": false, "value": "no video source files found"})
 		return
 	}

@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -144,6 +145,19 @@ func makeThumbsHandler(c *gin.Context) {
 		if params.MaxThumbs > 0 && numCreated >= params.MaxThumbs {
 			break
 		}
+		if filepath.Ext(f) == ".ts" {
+			// Let's convert first to mp4
+			newName := strings.TrimSuffix(f, ".ts")+".mp4"
+			cmd := exec.Command("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", f, "-c", "copy", newName)
+			var out []byte
+			out, err = cmd.CombinedOutput()
+			if err != nil {
+				log.Println(err, string(out), newName)
+				c.JSON(200, M{"success": false, "value": err.Error()+": "+string(out)})
+				return
+			}
+			f = newName
+		}
 		m, _ := mimetype.DetectFile(f)
 		mimeType := m.String()
 		if lo.Contains(imageTypes, mimeType) {
@@ -156,7 +170,7 @@ func makeThumbsHandler(c *gin.Context) {
 			continue
 		}
 		if lo.Contains(videoTypes, mimeType) {
-			// The source is vide, making frames
+			// The source is video, making frames
 			_ = os.MkdirAll(filepath.Join(tmpDir, "frames"), os.ModePerm)
 			maxFrames := params.Format.MaxThumbs - numCreated
 			if maxFrames < 0 {
