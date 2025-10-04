@@ -7,12 +7,12 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -44,7 +44,7 @@ func makeThumbsHandler(c *gin.Context) {
 		return
 	}
 	var tmpDir string
-	tmpDir, err = ioutil.TempDir(conversionPath, "make_thumbs_")
+	tmpDir, err = os.MkdirTemp(conversionPath, "make_thumbs_")
 	if err != nil {
 		log.Println(err)
 		c.JSON(200, M{"success": false, "value": err.Error()})
@@ -57,28 +57,30 @@ func makeThumbsHandler(c *gin.Context) {
 		c.JSON(200, M{"success": false, "value": "wrong source server url: " + err.Error()})
 		return
 	}
-	var hostPort = strings.Split(sourceServer.Endpoint, ":")
+	/*var hostPort = strings.Split(sourceServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
 		sourceServer.Endpoint = strings.Join(hostPort, ":")
-	}
+	}*/
 	var destinationServer *types.S3Server
 	if destinationServer, err = types.S3FromURL(params.Destination); err != nil {
 		log.Println(err)
 		c.JSON(200, M{"success": false, "value": "wrong destination server url: " + err.Error()})
 		return
 	}
-	hostPort = strings.Split(destinationServer.Endpoint, ":")
+
+	/*hostPort = strings.Split(destinationServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
 		destinationServer.Endpoint = strings.Join(hostPort, ":")
-	}
+	}*/
 	var sourceFileNames []string
 	if sourceFileNames, err = queries.StorageList(c, sourceServer, sourceServer.ObjectName); err != nil {
 		log.Println(err)
 		c.JSON(200, M{"success": false, "value": err.Error()})
 		return
 	}
+	slices.Sort(sourceFileNames)
 	_ = os.MkdirAll(filepath.Join(tmpDir, "sources"), os.ModePerm)
 	for _, s := range sourceFileNames {
 		err = queries.StorageFileGet(c, sourceServer, s, filepath.Join(tmpDir, "sources", filepath.Base(s)))
@@ -89,6 +91,7 @@ func makeThumbsHandler(c *gin.Context) {
 		}
 	}
 	filenames, _ := filepath.Glob(filepath.Join(tmpDir, "sources", "*"))
+	slices.Sort(filenames)
 	var numCreated int64
 	size := fmt.Sprintf("%dx%d", params.Format.Size.Width, params.Format.Size.Height)
 	retina := false
@@ -135,9 +138,9 @@ func makeThumbsHandler(c *gin.Context) {
 		numCreated++
 		return nil
 	}
-	if params.MaxThumbs > 0 {
+	/*if params.MaxThumbs > 0 {
 		filenames = lo.Shuffle(filenames)
-	}
+	}*/
 	for _, f := range filenames {
 		if params.Format.MaxThumbs > 0 && numCreated >= params.Format.MaxThumbs {
 			break
@@ -147,13 +150,13 @@ func makeThumbsHandler(c *gin.Context) {
 		}
 		if filepath.Ext(f) == ".ts" {
 			// Let's convert first to mp4
-			newName := strings.TrimSuffix(f, ".ts")+".mp4"
+			newName := strings.TrimSuffix(f, ".ts") + ".mp4"
 			cmd := exec.Command("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", f, "-c", "copy", newName)
 			var out []byte
 			out, err = cmd.CombinedOutput()
 			if err != nil {
 				log.Println(err, string(out), newName)
-				c.JSON(200, M{"success": false, "value": err.Error()+": "+string(out)})
+				c.JSON(200, M{"success": false, "value": err.Error() + ": " + string(out)})
 				return
 			}
 			f = newName
@@ -184,9 +187,10 @@ func makeThumbsHandler(c *gin.Context) {
 			}
 			var frameFiles []string
 			frameFiles, _ = filepath.Glob(filepath.Join(tmpDir, "frames", "*"))
-			if params.MaxThumbs > 0 {
+			slices.Sort(frameFiles)
+			/*if params.MaxThumbs > 0 {
 				frameFiles = lo.Shuffle(frameFiles)
-			}
+			}*/
 			for _, f := range frameFiles {
 				if params.Format.MaxThumbs > 0 && numCreated >= params.Format.MaxThumbs {
 					break

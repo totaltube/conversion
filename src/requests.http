@@ -1,0 +1,10 @@
+
+POST http://localhost:9099/make-thumbs
+Content-Type: application/json
+
+{
+	"source": "s3://totaltube-conversion/sources/1/1.mp4",
+	"destination": "s3://totaltube-conversion/destinations/1/1.mp4",
+	"max_thumbs": 10,
+	"format": "jpg"
+}

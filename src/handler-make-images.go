@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -35,7 +34,7 @@ func makeImagesHandler(c *gin.Context) {
 		params.Format.Command = "%MAGICK_PATH%convert %SOURCE_FILE% -thumbnail %SIZE%^ -gravity center -extent %SIZE% -quality 92 %RESULT_FILE%"
 	}
 	var tmpDir string
-	tmpDir, err = ioutil.TempDir(conversionPath, "make_images_")
+	tmpDir, err = os.MkdirTemp(conversionPath, "make_images_")
 	if err != nil {
 		log.Println(err)
 		c.JSON(200, M{"success": false, "value": err.Error()})
@@ -49,22 +48,22 @@ func makeImagesHandler(c *gin.Context) {
 		c.JSON(200, M{"success": false, "value": "wrong source server url: " + err.Error()})
 		return
 	}
-	var hostPort = strings.Split(sourceServer.Endpoint, ":")
+	/*var hostPort = strings.Split(sourceServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
 		sourceServer.Endpoint = strings.Join(hostPort, ":")
-	}
+	}*/
 	var destinationServer *types.S3Server
 	if destinationServer, err = types.S3FromURL(params.Destination); err != nil {
 		log.Println(err)
 		c.JSON(200, M{"success": false, "value": "wrong destination server url: " + err.Error()})
 		return
 	}
-	hostPort = strings.Split(destinationServer.Endpoint, ":")
+	/*hostPort = strings.Split(destinationServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
 		destinationServer.Endpoint = strings.Join(hostPort, ":")
-	}
+	}*/
 	var sourceFileNames []string
 	if sourceFileNames, err = queries.StorageList(c, sourceServer, sourceServer.ObjectName); err != nil {
 		log.Println(err)
@@ -138,9 +137,9 @@ func makeImagesHandler(c *gin.Context) {
 		numCreated++
 		return
 	}
-	if params.Format.MaxAmount > 0 {
+	/*if params.Format.MaxAmount > 0 {
 		filenames = lo.Shuffle(filenames)
-	}
+	}*/
 	var items = make([]string, 0, 300)
 	var previewItems = make([]string, 0, 300)
 	for _, f := range filenames {
@@ -180,9 +179,9 @@ func makeImagesHandler(c *gin.Context) {
 			}
 			var frameFiles []string
 			frameFiles, _ = filepath.Glob(filepath.Join(tmpDir, "frames", "*"))
-			if params.Format.MaxAmount > 0 {
+			/*if params.Format.MaxAmount > 0 {
 				frameFiles = lo.Shuffle(frameFiles)
-			}
+			}*/
 			for _, f := range frameFiles {
 				if params.Format.MaxAmount > 0 && numCreated >= params.Format.MaxAmount {
 					break

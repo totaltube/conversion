@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gin-gonic/gin"
@@ -41,11 +40,11 @@ func videoInfoHandler(c *gin.Context) {
 		c.JSON(200, M{"success": false, "value": "wrong source server url: " + err.Error()})
 		return
 	}
-	var hostPort = strings.Split(sourceServer.Endpoint, ":")
+	/*var hostPort = strings.Split(sourceServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
 		sourceServer.Endpoint = strings.Join(hostPort, ":")
-	}
+	}*/
 	var sourceFilename = filepath.Join(tmpDir, filepath.Base(sourceServer.ObjectName))
 	err = queries.StorageFileGet(c, sourceServer, sourceServer.ObjectName, sourceFilename)
 	if err != nil {

@@ -41,22 +41,22 @@ func makeVideoHandler(c *gin.Context) {
 		c.JSON(200, M{"success": false, "value": "wrong source server url: " + err.Error()})
 		return
 	}
-	var hostPort = strings.Split(sourceServer.Endpoint, ":")
+	/*var hostPort = strings.Split(sourceServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
 		sourceServer.Endpoint = strings.Join(hostPort, ":")
-	}
+	}*/
 	var destinationServer *types.S3Server
 	if destinationServer, err = types.S3FromURL(params.Destination); err != nil {
 		log.Println(err)
 		c.JSON(200, M{"success": false, "value": "wrong destination server url: " + err.Error()})
 		return
 	}
-	hostPort = strings.Split(destinationServer.Endpoint, ":")
+	/*hostPort = strings.Split(destinationServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
 		destinationServer.Endpoint = strings.Join(hostPort, ":")
-	}
+	}*/
 	var sourceFileNames []string
 	if sourceFileNames, err = queries.StorageList(c, sourceServer, sourceServer.ObjectName); err != nil {
 		log.Println(err)

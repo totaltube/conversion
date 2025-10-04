@@ -1,16 +1,35 @@
+version := 1.0
+SOURCES := $(shell find src -type f)
 
-totaltube-conversion: $(shell find src/ -type f)
-	cd src && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags='-s -w' -o ../totaltube-conversion
+# Собираем бинарь через docker-контейнер sersh/golang-builder
+bin/totaltube-conversion: $(SOURCES)
+	@mkdir -p bin
+	@docker run \
+		-v /home/sersh/projects/fasttube/totaltube-conversion:/src \
+		-v /home/sersh/go/docker/bin:/go/bin \
+		-v /home/sersh/go/docker/pkg:/go/pkg \
+		-v /home/sersh/go/docker/src:/go/src \
+		-v /home/sersh/go/docker/.cache:/root/.cache \
+		--name ttt-minion-build -t --rm sersh/golang-builder \
+		make -C /src bin/docker-totaltube-conversion
+	@cp bin/docker-totaltube-conversion bin/totaltube-conversion && rm -f bin/docker-totaltube-conversion
 
-build-docker:
-	docker build -t sersh/totaltube-conversion --no-cache .
+# ВНУТРИ докера: реальная сборка статического бинаря
+bin/docker-totaltube-conversion: $(SOURCES)
+	cd src && CGO_ENABLED=1 CGO_LDFLAGS="-static" GOOS=linux GOARCH=amd64 go build \
+		--tags="netgo osusergo" \
+		--ldflags='-s -w -X main.version=$(version) -extldflags=-static' \
+		-o ../bin/docker-totaltube-conversion .
+
+build-docker: bin/totaltube-conversion
+	docker build -t sersh/totaltube-conversion .
 
 deploy: build-docker
 	docker push sersh/totaltube-conversion
 
 upgrade-sersh: deploy
 	ssh ax1 'cd static && docker compose pull conversion && docker compose up -d conversion'
-.DEFAULT_GOAL := totaltube-conversion
+.DEFAULT_GOAL := bin/totaltube-conversion
 
 run-test:
 	docker run --rm -it --gpus all -e TOTALTUBE_CONVERSION_API_KEY=1aaPAyzAfcjn6dC4dSmbk0dwT9BdQ2 \
