@@ -74,6 +74,22 @@ func makeThumbsHandler(c *gin.Context) {
 		hostPort[0] = "host.docker.internal"
 		destinationServer.Endpoint = strings.Join(hostPort, ":")
 	}*/
+	var videoSourceServer *types.S3Server
+	if params.VideoSource != "" {
+		if videoSourceServer, err = types.S3FromURL(params.VideoSource); err != nil {
+			log.Println(err)
+			c.JSON(200, M{"success": false, "value": "wrong video source server url: " + err.Error()})
+			return
+		}
+	}
+	var destinationVideoPreviewServer *types.S3Server
+	if params.DestinationVideoPreview != "" {
+		if destinationVideoPreviewServer, err = types.S3FromURL(params.DestinationVideoPreview); err != nil {
+			log.Println(err)
+			c.JSON(200, M{"success": false, "value": "wrong destination video preview server url: " + err.Error()})
+			return
+		}
+	}
 	var sourceFileNames []string
 	if sourceFileNames, err = queries.StorageList(c, sourceServer, sourceServer.ObjectName); err != nil {
 		log.Println(err)
@@ -95,6 +111,8 @@ func makeThumbsHandler(c *gin.Context) {
 	var numCreated int64
 	size := fmt.Sprintf("%dx%d", params.Format.Size.Width, params.Format.Size.Height)
 	retina := false
+	videoPreviewCreated := false
+	hasVideoFiles := false
 	var processImage = func(imageFile string) error {
 		reader, _ := os.Open(imageFile)
 		defer reader.Close()
@@ -173,6 +191,7 @@ func makeThumbsHandler(c *gin.Context) {
 			continue
 		}
 		if lo.Contains(videoTypes, mimeType) {
+			hasVideoFiles = true
 			// The source is video, making frames
 			_ = os.MkdirAll(filepath.Join(tmpDir, "frames"), os.ModePerm)
 			maxFrames := params.Format.MaxThumbs - numCreated
@@ -207,6 +226,71 @@ func makeThumbsHandler(c *gin.Context) {
 			}
 		}
 	}
+
+	// Create video preview if requested
+	if params.Format.CreateVideoPreview {
+		var videoSourceFile string
+
+		// If video_source is specified, use it for video preview
+		if videoSourceServer != nil {
+			var videoSourceFileNames []string
+			if videoSourceFileNames, err = queries.StorageList(c, videoSourceServer, videoSourceServer.ObjectName); err != nil {
+				log.Printf("Failed to list video source files: %v", err)
+			} else {
+				// Download the first video file from VideoSource
+				for _, s := range videoSourceFileNames {
+					tempVideoPath := filepath.Join(tmpDir, "video_source", filepath.Base(s))
+					_ = os.MkdirAll(filepath.Dir(tempVideoPath), os.ModePerm)
+					err = queries.StorageFileGet(c, videoSourceServer, s, tempVideoPath)
+					if err != nil {
+						log.Printf("Failed to download video source file %s: %v", s, err)
+						continue
+					}
+					// Check if it's actually a video
+					m, _ := mimetype.DetectFile(tempVideoPath)
+					if lo.Contains(videoTypes, m.String()) {
+						videoSourceFile = tempVideoPath
+						break
+					}
+				}
+			}
+		} else if hasVideoFiles {
+			// Otherwise, try to find video in the main source
+			for _, f := range filenames {
+				m, _ := mimetype.DetectFile(f)
+				mimeType := m.String()
+				if lo.Contains(videoTypes, mimeType) {
+					videoSourceFile = f
+					break
+				}
+			}
+		}
+
+		if videoSourceFile != "" {
+			previewFileName := fmt.Sprintf("video-preview-%s.mp4", params.Format.Name)
+			previewFilePath := filepath.Join(tmpDir, previewFileName)
+			err = CreateVideoPreview(videoSourceFile, tmpDir, params.Format, previewFilePath)
+			if err != nil {
+				log.Printf("Failed to create video preview: %v", err)
+				// Continue without preview, videoPreviewCreated remains false
+			} else {
+				videoPreviewCreated = true
+				// Upload video preview to destinationVideoPreviewServer if available
+				if destinationVideoPreviewServer != nil {
+					objectName := path.Join(destinationVideoPreviewServer.ObjectName, previewFileName)
+					err = queries.StorageFileUpload(c, destinationVideoPreviewServer, previewFilePath, objectName)
+					if err != nil {
+						log.Printf("Failed to upload video preview: %v", err)
+						videoPreviewCreated = false
+					}
+				} else {
+					log.Printf("No destination video preview server configured")
+					videoPreviewCreated = false
+				}
+			}
+		}
+	}
+
 	// Done. Uploading to the server
 	var success = false
 	defer func() {
@@ -240,5 +324,5 @@ func makeThumbsHandler(c *gin.Context) {
 		}
 	}
 	success = true
-	c.JSON(200, M{"success": true, "value": M{"num_created": numCreated, "retina": retina}})
+	c.JSON(200, M{"success": true, "value": M{"num_created": numCreated, "retina": retina, "video_preview": videoPreviewCreated}})
 }

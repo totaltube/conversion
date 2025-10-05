@@ -1,10 +1,12 @@
 package types
 
 type MakeThumbsRequest struct {
-	Source      string           `json:"source"`
-	Destination string           `json:"destination"`
-	MaxThumbs   int64            `json:"max_thumbs"`
-	Format      ThumbFormatShort `json:"format"`
+	Source                  string           `json:"source"`
+	VideoSource             string           `json:"video_source"`
+	Destination             string           `json:"destination"`
+	DestinationVideoPreview string           `json:"destination_video_preview"`
+	MaxThumbs               int64            `json:"max_thumbs"`
+	Format                  ThumbFormatShort `json:"format"`
 }
 
 type MakeImagesRequest struct {

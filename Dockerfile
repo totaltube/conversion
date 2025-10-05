@@ -1,6 +1,6 @@
 FROM sersh/ffmpegmagick
 
-COPY totaltube-conversion /bin/
+COPY bin/totaltube-conversion /bin/
 COPY .bashrc /root/
 WORKDIR /data
 VOLUME /data

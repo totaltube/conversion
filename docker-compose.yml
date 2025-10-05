@@ -5,14 +5,12 @@ services:
     image: docker.io/sersh/totaltube-conversion
     container_name: totaltube-conversion
     restart: always
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    network_mode: host
     logging:
       options:
         max-size: "200k"
         max-file: "5"
-    ports:
-      - "9099:8080"
     environment:
-      - TOTALTUBE_CONVERSION_API_KEY=1aaPAyzAfcjn6dC4dSmbk0dwT9BdQ2
+      - TOTALTUBE_CONVERSION_PORT=9099
+      - TOTALTUBE_CONVERSION_API_KEY=your-api-key
       - TOTALTUBE_CONVERSION_PATH=/data

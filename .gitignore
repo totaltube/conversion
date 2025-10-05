@@ -15,5 +15,8 @@ test
 ffmpeg2pass*
 .idea
 bin
+build-docker
+requests.http
+Makefile
 # Dependency directories (remove the comment below to include it)
 # vendor/

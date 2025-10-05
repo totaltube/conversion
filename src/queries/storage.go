@@ -17,7 +17,6 @@ import (
 	"github.com/totaltube/conversion/types"
 )
 
-
 func getClient(server types.S3ServerInterface) (client *minio.Client, err error) {
 	endpoint, secure, accessKey, secretKey, _ := server.S3()
 	return minio.New(endpoint, &minio.Options{

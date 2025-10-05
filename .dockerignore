@@ -1,7 +1,4 @@
-src
-.idea
-.gitignore
-Dockerfile
-LICENSE
-Makefile
-README.md
+*
+!bin
+!.bashrc
+!conversion-entrypoint.sh

@@ -452,12 +452,11 @@ func ConvertVideo(sourceFiles []string, tempPath string, targetPath string, form
 				return
 			}
 			var args = []string{"+append"}
-			for _, ti := range timelineImages {
-				args = append(args, ti)
-			}
-			if format.TimelineType == "jpg" {
+			args = append(args, timelineImages...)
+			switch format.TimelineType {
+			case "jpg":
 				args = append(args, "-quality", "85")
-			} else if format.TimelineType == "webp" {
+			case "webp":
 				args = append(args, "-quality", "92")
 			}
 			args = append(args, filepath.Join(targetPath, timelineFile))

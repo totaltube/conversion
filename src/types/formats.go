@@ -125,16 +125,22 @@ type ThumbFormat struct {
 
 // ThumbFormatShort for conversion server
 type ThumbFormatShort struct {
-	Name                string  `json:"name"`
-	Command             string  `json:"command"`
-	Size                Size    `json:"size"`
-	MinSourceSize       Size    `json:"min_source_size"`
-	MinSize             int64   `json:"min_size"`
-	MinTimeInterval     float64 `json:"min_time_interval"`
-	MaxThumbs           int64   `json:"max_thumbs"`
-	Type                string  `json:"type"`
-	Retina              bool    `json:"retina"`
-	RetinaMinSourceSize Size    `json:"retina_min_source_size"`
+	Name                string   `json:"name"`
+	Command             string   `json:"command"`
+	Size                Size     `json:"size"`
+	MinSourceSize       Size     `json:"min_source_size"`
+	MinSize             int64    `json:"min_size"`
+	MinTimeInterval     float64  `json:"min_time_interval"`
+	MaxThumbs           int64    `json:"max_thumbs"`
+	Type                string   `json:"type"`
+	Retina              bool     `json:"retina"`
+	RetinaMinSourceSize Size     `json:"retina_min_source_size"`
+	CreateVideoPreview  bool     `json:"create_video_preview"`
+	VideoFormats        []string `json:"video_formats"`
+	VideoSize           Size     `json:"video_size"`
+	SegmentsCount       int64    `json:"segments_count"`
+	SegmentDuration     float64  `json:"segment_duration"`
+	VideoBitrate        int64    `json:"video_bitrate"`
 }
 
 func (tf ThumbFormat) CompatMarshalJSON() ([]byte, error) {
