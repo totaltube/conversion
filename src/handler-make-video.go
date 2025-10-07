@@ -52,6 +52,16 @@ func makeVideoHandler(c *gin.Context) {
 		c.JSON(200, M{"success": false, "value": "wrong destination server url: " + err.Error()})
 		return
 	}
+	var posterDestinationServer *types.S3Server
+	if params.PosterDestination != "" {
+		if posterDestinationServer, err = types.S3FromURL(params.PosterDestination); err != nil {
+			log.Println(err)
+			c.JSON(200, M{"success": false, "value": "wrong poster destination server url: " + err.Error()})
+			return
+		}
+	} else {
+		posterDestinationServer = destinationServer
+	}
 	/*hostPort = strings.Split(destinationServer.Endpoint, ":")
 	if hostPort[0] == "localhost" || hostPort[0] == "127.0.0.1" {
 		hostPort[0] = "host.docker.internal"
@@ -129,12 +139,35 @@ func makeVideoHandler(c *gin.Context) {
 					}
 				}
 			}
+			list, err1 = queries.StorageList(ctx, posterDestinationServer, posterDestinationServer.ObjectName)
+			if err1 != nil {
+				log.Println(err1)
+				return
+			}
+			for _, entry := range list {
+				if strings.HasPrefix(path.Base(entry), fmt.Sprintf("poster-%s.", params.Format.Name)) {
+					err1 = queries.StorageDelete(ctx, posterDestinationServer, entry)
+					if err1 != nil {
+						log.Println(err1)
+					}
+				}
+			}
 		}
 	}()
 	var resultFiles []string
 	resultFiles, _ = filepath.Glob(filepath.Join(tmpDir, "result", "*"))
 	for _, f := range resultFiles {
 		objectName := path.Join(destinationServer.ObjectName, filepath.Base(f))
+		if strings.HasPrefix(filepath.Base(f), "poster-") {
+			objectName = path.Join(posterDestinationServer.ObjectName, filepath.Base(f))
+			err = queries.StorageFileUpload(c, posterDestinationServer, f, objectName)
+			if err != nil {
+				log.Println(err)
+				c.JSON(200, M{"success": false, "value": err.Error()})
+				return
+			}
+			continue
+		}
 		err = queries.StorageFileUpload(c, destinationServer, f, objectName)
 		if err != nil {
 			log.Println(err)

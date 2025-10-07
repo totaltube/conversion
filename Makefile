@@ -30,6 +30,7 @@ deploy: build-docker
 
 upgrade-sersh: deploy
 	ssh ax1 'cd static && docker compose pull conversion && docker compose up -d conversion'
+	ssh ox1 'docker compose pull conversion && docker compose up -d conversion'
 .DEFAULT_GOAL := bin/totaltube-conversion
 
 run-test: build-docker

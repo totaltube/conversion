@@ -16,9 +16,10 @@ type MakeImagesRequest struct {
 }
 
 type MakeVideoRequest struct {
-	Source      string           `json:"source"`
-	Destination string           `json:"destination"`
-	Format      VideoFormatShort `json:"format"`
+	Source            string           `json:"source"`
+	Destination       string           `json:"destination"`
+	PosterDestination string           `json:"poster_destination"`
+	Format            VideoFormatShort `json:"format"`
 }
 
 type VideoInfoRequest struct {
