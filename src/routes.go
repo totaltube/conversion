@@ -18,4 +18,5 @@ func setRoutes(app *gin.Engine) {
 	app.POST("/make-images", makeImagesHandler)
 	app.POST("/make-video", makeVideoHandler)
 	app.POST("/video-info", videoInfoHandler)
+	app.POST("/create-preview", createPreviewHandler)
 }

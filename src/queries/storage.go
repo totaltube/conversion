@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,6 +17,12 @@ import (
 
 	"github.com/totaltube/conversion/types"
 )
+
+// FileInfo represents file information with name and size
+type FileInfo struct {
+	Name string
+	Size int64
+}
 
 func getClient(server types.S3ServerInterface) (client *minio.Client, err error) {
 	endpoint, secure, accessKey, secretKey, _ := server.S3()
@@ -72,6 +79,38 @@ func StorageList(ctx context.Context, server types.S3ServerInterface, path strin
 		}
 		list = append(list, object.Key)
 	}
+	return
+}
+
+// StorageListWithSort returns list of files with optional sorting
+func StorageListWithSort(ctx context.Context, server types.S3ServerInterface, path string, sortBy string) (list []FileInfo, err error) {
+	path = strings.TrimPrefix(path, "/")
+	c, cancel := context.WithTimeout(ctx, time.Minute*10)
+	defer cancel()
+	// Initialize minio client object.
+	var minioClient *minio.Client
+	if minioClient, err = getClient(server); err != nil {
+		log.Println(err)
+		return
+	}
+	list = make([]FileInfo, 0, 10)
+	_, _, _, _, bucket := server.S3()
+	for object := range minioClient.ListObjects(c, bucket, minio.ListObjectsOptions{Prefix: path, Recursive: true}) {
+		if object.Err != nil {
+			err = object.Err
+			log.Println(err)
+			return
+		}
+		list = append(list, FileInfo{Name: object.Key, Size: object.Size})
+	}
+
+	// Sort by size if requested
+	if sortBy == "size" {
+		sort.Slice(list, func(i, j int) bool {
+			return list[i].Size > list[j].Size // descending order (largest first)
+		})
+	}
+
 	return
 }
 

@@ -22,6 +22,12 @@ type MakeVideoRequest struct {
 	Format            VideoFormatShort `json:"format"`
 }
 
+type CreatePreviewRequest struct {
+	Source      string           `json:"source"`
+	Destination string           `json:"destination"`
+	Format      ThumbFormatShort `json:"format"`
+}
+
 type VideoInfoRequest struct {
 	Source string `json:"source"`
 }
